@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useAppSelector } from '@/store';
+import { useRecentTransactions } from '@/hooks/useTransactions';
+import { TransactionType } from '@/types';
 import {
     HiOutlineUserAdd,
     HiOutlineCreditCard,
@@ -44,6 +46,8 @@ const features = [
 
 export default function DashboardPage() {
     const { cliente, isAuthenticated } = useAppSelector((state) => state.auth);
+    const { data: recentTxResponse, isLoading: isLoadingTx } = useRecentTransactions();
+    const recentTransactions = recentTxResponse?.data || [];
 
     return (
         <div className="space-y-8">
@@ -69,6 +73,46 @@ export default function DashboardPage() {
                         <p className="text-emerald-100 text-xs">
                             Doc: {cliente.documento} • Tel: {cliente.celular}
                         </p>
+                    </div>
+                </div>
+            )}
+
+            {/* Recent Transactions Widget */}
+            {isAuthenticated && (
+                <div className="rounded-2xl border border-slate-700/50 bg-slate-800/30 backdrop-blur-xl p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold text-white">Movimientos Recientes</h2>
+                        <Link to="/historial" className="text-sm text-emerald-400 hover:text-emerald-300">
+                            Ver todo
+                        </Link>
+                    </div>
+
+                    <div className="space-y-4">
+                        {isLoadingTx ? (
+                            <p className="text-slate-500 text-sm">Cargando...</p>
+                        ) : recentTransactions.length === 0 ? (
+                            <p className="text-slate-500 text-sm">No tienes movimientos recientes.</p>
+                        ) : (
+                            recentTransactions.map((tx) => (
+                                <div key={tx._id} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 hover:bg-slate-700/50 transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-2 h-2 rounded-full ${tx.type === TransactionType.PAGO_ENVIADO ? 'bg-red-400' : 'bg-emerald-400'}`} />
+                                        <div>
+                                            <p className="text-sm text-white font-medium">
+                                                {tx.type === TransactionType.RECARGA ? 'Recarga' :
+                                                    tx.type === TransactionType.PAGO_ENVIADO ? 'Pago Enviado' : 'Pago Recibido'}
+                                            </p>
+                                            <p className="text-xs text-slate-400">
+                                                {new Date(tx.createdAt).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <p className={`font-mono font-bold ${tx.type === TransactionType.PAGO_ENVIADO ? 'text-red-400' : 'text-emerald-400'}`}>
+                                        {tx.type === TransactionType.PAGO_ENVIADO ? '-' : '+'}${tx.amount.toLocaleString()}
+                                    </p>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
             )}

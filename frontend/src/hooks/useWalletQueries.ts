@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
     registrarCliente,
@@ -38,12 +38,16 @@ export const useRegistrarCliente = () => {
 // ── Recarga de billetera ──
 export const useRecargarBilletera = () => {
     const dispatch = useAppDispatch();
+    const queryClient = useQueryClient();
 
     return useMutation({
         mutationFn: recargarBilletera,
         onSuccess: (response) => {
             if (response.success && response.data) {
                 dispatch(updateSaldo(response.data.saldo));
+                // Invalidate queries to refresh data
+                queryClient.invalidateQueries({ queryKey: ['transactions'] });
+                queryClient.invalidateQueries({ queryKey: ['authBalance'] });
                 toast.success(response.message || 'Recarga exitosa');
             }
         },
@@ -81,12 +85,16 @@ export const useSolicitarPago = () => {
 // ── Confirmar pago ──
 export const useConfirmarPago = () => {
     const dispatch = useAppDispatch();
+    const queryClient = useQueryClient();
 
     return useMutation({
         mutationFn: confirmarPago,
         onSuccess: (response) => {
             if (response.success) {
                 dispatch(clearPaymentSession());
+                // Invalidate queries to refresh data
+                queryClient.invalidateQueries({ queryKey: ['transactions'] });
+                queryClient.invalidateQueries({ queryKey: ['authBalance'] });
                 toast.success(response.message || 'Pago confirmado exitosamente');
             }
         },

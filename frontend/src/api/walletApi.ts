@@ -13,6 +13,7 @@ import type {
     Cliente,
     PaymentSessionResponse,
     BalanceResponse,
+    Transaction,
 } from '@/types';
 
 // ── Auth ──
@@ -113,5 +114,16 @@ export const consultarSaldo = async (
         '/consultarSaldo',
         data
     );
+    return response.data;
+};
+
+// ── Historial de Transacciones ──
+export const getTransactions = async (): Promise<ApiResponse<Transaction[]>> => {
+    const response = await axiosClient.get<ApiResponse<Transaction[]>>('/transactions');
+    return response.data;
+};
+
+export const getRecentTransactions = async (): Promise<ApiResponse<Transaction[]>> => {
+    const response = await axiosClient.get<ApiResponse<Transaction[]>>('/transactions/recent');
     return response.data;
 };

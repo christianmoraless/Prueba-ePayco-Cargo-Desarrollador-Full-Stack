@@ -5,6 +5,7 @@ import {
     HiOutlineCreditCard,
     HiOutlineCash,
     HiOutlineSearch,
+    HiOutlineClipboardList,
 } from 'react-icons/hi';
 
 const navItems = [
@@ -13,6 +14,7 @@ const navItems = [
     { to: '/recarga', label: 'Recarga', icon: HiOutlineCreditCard },
     { to: '/pago', label: 'Pago', icon: HiOutlineCash },
     { to: '/saldo', label: 'Saldo', icon: HiOutlineSearch },
+    { to: '/historial', label: 'Historial', icon: HiOutlineClipboardList },
 ];
 
 interface SidebarProps {

@@ -9,6 +9,7 @@ import RegisterPage from '@/pages/RegisterPage';
 import RechargePage from '@/pages/RechargePage';
 import PaymentPage from '@/pages/PaymentPage';
 import BalancePage from '@/pages/BalancePage';
+import TransactionsPage from '@/pages/TransactionsPage';
 
 function App() {
     return (
@@ -27,6 +28,7 @@ function App() {
                         <Route path="/recarga" element={<RechargePage />} />
                         <Route path="/pago" element={<PaymentPage />} />
                         <Route path="/saldo" element={<BalancePage />} />
+                        <Route path="/historial" element={<TransactionsPage />} />
                     </Route>
                 </Route>
             </Routes>

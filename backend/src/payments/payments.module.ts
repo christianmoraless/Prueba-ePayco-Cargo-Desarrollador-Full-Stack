@@ -9,6 +9,7 @@ import {
 
 import { ClientsModule } from '../clients/clients.module';
 import { AuthModule } from '../auth/auth.module';
+import { TransactionsModule } from '../transactions/transactions.module';
 
 @Module({
     imports: [
@@ -17,6 +18,7 @@ import { AuthModule } from '../auth/auth.module';
         ]),
         ClientsModule,
         AuthModule,
+        TransactionsModule,
     ],
     controllers: [PaymentsController],
     providers: [PaymentsService],

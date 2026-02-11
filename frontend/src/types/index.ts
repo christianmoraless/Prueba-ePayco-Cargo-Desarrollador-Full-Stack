@@ -79,3 +79,22 @@ export interface BalanceResponse {
     nombres: string;
     saldo: number;
 }
+
+// ── Transacciones ──
+export enum TransactionType {
+    RECARGA = 'RECARGA',
+    PAGO_ENVIADO = 'PAGO_ENVIADO',
+    PAGO_RECIBIDO = 'PAGO_RECIBIDO',
+}
+
+export interface Transaction {
+    _id: string;
+    userId: string;
+    type: TransactionType;
+    amount: number;
+    referenceId: string;
+    relatedUser?: string;
+    description?: string;
+    createdAt: string;
+    updatedAt: string;
+}

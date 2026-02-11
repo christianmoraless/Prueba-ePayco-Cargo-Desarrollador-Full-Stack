@@ -12,6 +12,8 @@ import {
 } from './schemas/payment-session.schema';
 import { ClientsService } from '../clients/clients.service';
 import { MailService } from '../mail/mail.service';
+import { TransactionsService } from '../transactions/transactions.service';
+import { TransactionType } from '../transactions/schemas/transaction.schema';
 import { RequestPaymentDto } from './dto/request-payment.dto';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 
@@ -22,6 +24,7 @@ export class PaymentsService {
         private paymentSessionModel: Model<PaymentSessionDocument>,
         private readonly clientsService: ClientsService,
         private readonly mailService: MailService,
+        private readonly transactionsService: TransactionsService,
     ) { }
 
     private generateOtp(): string {
@@ -99,12 +102,32 @@ export class PaymentsService {
         // 2. Descontar al Pagador
         await this.clientsService.updateSaldo(pagador.documento, pagador.saldo - session.valor);
 
+        // REGISTRAR MOVIMIENTO: PAGO ENVIADO (Pagador)
+        await this.transactionsService.create(
+            pagador.documento,
+            TransactionType.PAGO_ENVIADO,
+            session.valor,
+            session.sessionId,
+            session.documentoReceptor, // Relacionado con el beneficiario
+            'Pago enviado a ' + session.documentoReceptor,
+        );
+
         // 3. Acreditar al Beneficiario
         // Usamos try/catch para no bloquear el flujo si algo raro pasa con el beneficiario, 
         // aunque idealmente usaríamos transacciones.
         try {
             const beneficiario = await this.clientsService.findByDocumento(session.documentoReceptor);
             await this.clientsService.updateSaldo(beneficiario.documento, beneficiario.saldo + session.valor);
+
+            // REGISTRAR MOVIMIENTO: PAGO RECIBIDO (Beneficiario)
+            await this.transactionsService.create(
+                beneficiario.documento,
+                TransactionType.PAGO_RECIBIDO,
+                session.valor,
+                session.sessionId,
+                pagador.documento, // Relacionado con el pagador
+                'Pago recibido de ' + pagador.documento,
+            );
         } catch (error) {
             console.error(`Error acreditando al beneficiario ${session.documentoReceptor}`, error);
             // IMPORTANTE: Aquí deberíamos revertir el descuento al pagador o marcar la transacción para revisión manual.
