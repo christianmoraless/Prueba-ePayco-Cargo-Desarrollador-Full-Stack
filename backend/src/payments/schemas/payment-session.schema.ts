@@ -20,6 +20,9 @@ export class PaymentSession {
     @Prop({ required: true })
     token: string;
 
+    @Prop({ required: true })
+    documentoReceptor: string;
+
     @Prop({ default: false })
     confirmed: boolean;
 

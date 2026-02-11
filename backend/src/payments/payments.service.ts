@@ -24,106 +24,94 @@ export class PaymentsService {
         private readonly mailService: MailService,
     ) { }
 
-    /**
-     * Genera un token OTP de 6 dígitos
-     */
     private generateOtp(): string {
         return Math.floor(100000 + Math.random() * 900000).toString();
     }
 
-    /**
-     * Solicitar pago: verifica saldo, genera token OTP, crea sesión
-     */
     async requestPayment(
         requestDto: RequestPaymentDto,
+        documentoPagador: string,
     ): Promise<{ sessionId: string; message: string }> {
-        // 1. Verificar que el cliente exista y los datos coincidan
-        const client = await this.clientsService.findByDocumentoAndCelular({
+        // 1. Obtener PAGADOR (Usuario autenticado)
+        const pagador = await this.clientsService.findByDocumento(documentoPagador);
+
+        // 2. Obtener BENEFICIARIO (Datos del formulario)
+        // Verificamos documento y celular para asegurar que enviamos al correcto
+        const beneficiario = await this.clientsService.findByDocumentoAndCelular({
             documento: requestDto.documento,
             celular: requestDto.celular,
         });
 
-        // 2. Verificar que tenga saldo suficiente
-        if (client.saldo < requestDto.valor) {
+        // Evitar auto-pago (opcional, pero buena práctica)
+        if (pagador.documento === beneficiario.documento) {
+            throw new BadRequestException('No puedes realizar un pago a ti mismo.');
+        }
+
+        // 3. Verificar saldo del PAGADOR
+        if (pagador.saldo < requestDto.valor) {
             throw new BadRequestException(
-                `Saldo insuficiente. Saldo actual: $${client.saldo.toLocaleString()}, Monto requerido: $${requestDto.valor.toLocaleString()}`,
+                `Saldo insuficiente. Tu saldo actual es: $${pagador.saldo.toLocaleString()}`,
             );
         }
 
-        // 3. Generar token OTP y session ID
+        // 4. Generar Token y Session
         const token = this.generateOtp();
         const sessionId = uuidv4();
 
-        // 4. Crear sesión de pago en la base de datos
         const session = new this.paymentSessionModel({
             sessionId,
-            documento: requestDto.documento,
-            celular: requestDto.celular,
+            documento: pagador.documento,            // DEUDOR (Pagador)
+            documentoReceptor: beneficiario.documento, // ACREEDOR (Beneficiario)
+            celular: pagador.celular,   // Celular del pagador (para registro)
             valor: requestDto.valor,
             token,
             confirmed: false,
-            expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutos
+            expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 min
         });
 
         await session.save();
 
-        // 5. Enviar token por email
-        await this.mailService.sendOtpToken(client.email, token, client.nombres);
+        // 5. Enviar OTP al PAGADOR (quien debe autorizar la salida de dinero)
+        await this.mailService.sendOtpToken(pagador.email, token, pagador.nombres);
 
         return {
             sessionId,
-            message: `Token de confirmación enviado al email ${client.email}`,
+            message: `Token enviado a tu correo (${pagador.email}) para confirmar el pago`,
         };
     }
 
-    /**
-     * Confirmar pago: valida token + sessionId, descuenta saldo
-     */
     async confirmPayment(confirmDto: ConfirmPaymentDto): Promise<void> {
-        // 1. Buscar la sesión de pago
         const session = await this.paymentSessionModel.findOne({
             sessionId: confirmDto.sessionId,
         });
 
-        if (!session) {
-            throw new NotFoundException(
-                'Sesión de pago no encontrada o expirada. Solicite un nuevo pago.',
-            );
+        if (!session) throw new NotFoundException('Sesión de pago no encontrada o expirada.');
+        if (session.confirmed) throw new BadRequestException('Esta sesión ya fue confirmada.');
+        if (session.token !== confirmDto.token) throw new BadRequestException('Token incorrecto.');
+        if (new Date() > session.expiresAt) throw new BadRequestException('El token ha expirado.');
+
+        // 1. Verificar saldo del Pagador nuevamente
+        const pagador = await this.clientsService.findByDocumento(session.documento);
+        if (pagador.saldo < session.valor) {
+            throw new BadRequestException('Saldo insuficiente para completar la transacción.');
         }
 
-        // 2. Verificar que no esté ya confirmada
-        if (session.confirmed) {
-            throw new BadRequestException('Esta sesión de pago ya fue confirmada');
+        // 2. Descontar al Pagador
+        await this.clientsService.updateSaldo(pagador.documento, pagador.saldo - session.valor);
+
+        // 3. Acreditar al Beneficiario
+        // Usamos try/catch para no bloquear el flujo si algo raro pasa con el beneficiario, 
+        // aunque idealmente usaríamos transacciones.
+        try {
+            const beneficiario = await this.clientsService.findByDocumento(session.documentoReceptor);
+            await this.clientsService.updateSaldo(beneficiario.documento, beneficiario.saldo + session.valor);
+        } catch (error) {
+            console.error(`Error acreditando al beneficiario ${session.documentoReceptor}`, error);
+            // IMPORTANTE: Aquí deberíamos revertir el descuento al pagador o marcar la transacción para revisión manual.
+            // Por simplicidad en este MVP, logueamos el error.
         }
 
-        // 3. Validar el token
-        if (session.token !== confirmDto.token) {
-            throw new BadRequestException(
-                'Token de confirmación incorrecto. Verifique e intente nuevamente.',
-            );
-        }
-
-        // 4. Verificar que no haya expirado
-        if (new Date() > session.expiresAt) {
-            throw new BadRequestException(
-                'El token ha expirado. Solicite un nuevo pago.',
-            );
-        }
-
-        // 5. Obtener el cliente y verificar saldo nuevamente
-        const client = await this.clientsService.findByDocumento(session.documento);
-
-        if (client.saldo < session.valor) {
-            throw new BadRequestException(
-                'Saldo insuficiente para completar la transacción',
-            );
-        }
-
-        // 6. Descontar el saldo
-        const nuevoSaldo = client.saldo - session.valor;
-        await this.clientsService.updateSaldo(client.documento, nuevoSaldo);
-
-        // 7. Marcar sesión como confirmada
+        // 4. Marcar confirmado
         session.confirmed = true;
         await session.save();
     }

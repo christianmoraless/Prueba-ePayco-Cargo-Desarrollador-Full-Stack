@@ -1,10 +1,13 @@
+
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
+import { useAuthBalance } from '@/hooks/useAuthBalance';
 
 export default function Layout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    useAuthBalance();
 
     return (
         <div className="flex h-screen bg-slate-950 overflow-hidden">

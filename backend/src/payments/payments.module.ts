@@ -6,7 +6,9 @@ import {
     PaymentSession,
     PaymentSessionSchema,
 } from './schemas/payment-session.schema';
+
 import { ClientsModule } from '../clients/clients.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
     imports: [
@@ -14,6 +16,7 @@ import { ClientsModule } from '../clients/clients.module';
             { name: PaymentSession.name, schema: PaymentSessionSchema },
         ]),
         ClientsModule,
+        AuthModule,
     ],
     controllers: [PaymentsController],
     providers: [PaymentsService],

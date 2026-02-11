@@ -107,7 +107,7 @@ export class ClientsService {
         const client = await this.clientModel.findOneAndUpdate(
             { documento },
             { saldo: nuevoSaldo },
-            { new: true },
+            { returnDocument: 'after' },
         );
 
         if (!client) {
